@@ -30,10 +30,17 @@ import static com.example.android.wearable.geofencing.Constants.YERBA_BUENA_RADI
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.content.LocalBroadcastManager;
+import android.text.TextUtils;
 import android.util.Log;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -41,14 +48,21 @@ import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 public class MainActivity extends Activity implements ConnectionCallbacks,
-        OnConnectionFailedListener {
+        OnConnectionFailedListener, ResultCallback<Status> {
+
+    TextView txt_login_time,txt_logout_time;
 
     // Internal List of Geofence objects. In a real app, these might be provided by an API based on
     // locations within the user's proximity.
@@ -56,7 +70,7 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
 
     // These will store hard-coded geofences in this sample app.
     private SimpleGeofence mAndroidBuildingGeofence;
-    private SimpleGeofence mYerbaBuenaGeofence;
+    //private SimpleGeofence mYerbaBuenaGeofence;
 
     // Persistent storage for geofences.
     private SimpleGeofenceStore mGeofenceStorage;
@@ -66,6 +80,11 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
     private PendingIntent mGeofenceRequestIntent;
     private GoogleApiClient mApiClient;
 
+    @Override
+    public void onResult(@NonNull Status status) {
+
+    }
+
     // Defines the allowable request types (in this example, we only add geofences).
     private enum REQUEST_TYPE {ADD}
     private REQUEST_TYPE mRequestType;
@@ -73,11 +92,14 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main_layout);
+        txt_login_time = findViewById(R.id.txt_login_time);
+        txt_logout_time = findViewById(R.id.txt_logout_time);
         // Rather than displayng this activity, simply display a toast indicating that the geofence
         // service is being created. This should happen in less than a second.
         if (!isGooglePlayServicesAvailable()) {
-            Log.e(TAG, "Google Play services unavailable.");
-            finish();
+            logGeoEvent("\nGoogle Play services unavailable.");
+            //finish();
             return;
         }
 
@@ -94,6 +116,7 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
         // Instantiate the current List of geofences.
         mGeofenceList = new ArrayList<Geofence>();
         createGeofences();
+        LocalBroadcastManager.getInstance(getApplicationContext()).registerReceiver(mLoginReceiver,new IntentFilter("ACTION_LOGIN"));
     }
 
     /**
@@ -110,20 +133,29 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
                 GEOFENCE_EXPIRATION_TIME,
                 Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT
         );
-        mYerbaBuenaGeofence = new SimpleGeofence(
+        /*mYerbaBuenaGeofence = new SimpleGeofence(
                 YERBA_BUENA_ID,                // geofenceId.
                 YERBA_BUENA_LATITUDE,
                 YERBA_BUENA_LONGITUDE,
                 YERBA_BUENA_RADIUS_METERS,
                 GEOFENCE_EXPIRATION_TIME,
                 Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT
-        );
+        );*/
 
         // Store these flat versions in SharedPreferences and add them to the geofence list.
         mGeofenceStorage.setGeofence(ANDROID_BUILDING_ID, mAndroidBuildingGeofence);
-        mGeofenceStorage.setGeofence(YERBA_BUENA_ID, mYerbaBuenaGeofence);
+        //mGeofenceStorage.setGeofence(YERBA_BUENA_ID, mYerbaBuenaGeofence);
         mGeofenceList.add(mAndroidBuildingGeofence.toGeofence());
-        mGeofenceList.add(mYerbaBuenaGeofence.toGeofence());
+        //mGeofenceList.add(mYerbaBuenaGeofence.toGeofence());
+    }
+
+    // Create a Geofence Request
+    private GeofencingRequest createGeofenceRequest( Geofence geofence ) {
+        logGeoEvent("\ncreateGeofenceRequest");
+        return new GeofencingRequest.Builder()
+                .setInitialTrigger( GeofencingRequest.INITIAL_TRIGGER_ENTER )
+                .addGeofence( geofence )
+                .build();
     }
 
 
@@ -135,11 +167,11 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
                 connectionResult.startResolutionForResult(this,
                         CONNECTION_FAILURE_RESOLUTION_REQUEST);
             } catch (IntentSender.SendIntentException e) {
-                Log.e(TAG, "Exception while resolving connection error.", e);
+                logGeoEvent("\nException while resolving connection error. : "+ e);
             }
         } else {
             int errorCode = connectionResult.getErrorCode();
-            Log.e(TAG, "Connection to Google Play services failed with error code " + errorCode);
+            logGeoEvent("\nConnection to Google Play services failed with error code : " + errorCode);
         }
     }
 
@@ -151,10 +183,10 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
         // Get the PendingIntent for the geofence monitoring request.
         // Send a request to add the current geofences.
         mGeofenceRequestIntent = getGeofenceTransitionPendingIntent();
-        LocationServices.GeofencingApi.addGeofences(mApiClient, mGeofenceList,
-                mGeofenceRequestIntent);
+        LocationServices.GeofencingApi.addGeofences(mApiClient, createGeofenceRequest(mAndroidBuildingGeofence.toGeofence()),
+                mGeofenceRequestIntent).setResultCallback(this);
         Toast.makeText(this, getString(R.string.start_geofence_service), Toast.LENGTH_SHORT).show();
-        finish();
+        //finish();
     }
 
     @Override
@@ -173,13 +205,19 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
         int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
         if (ConnectionResult.SUCCESS == resultCode) {
             if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "Google Play services is available.");
+                logGeoEvent("\nGoogle Play services is available.");
             }
             return true;
         } else {
-            Log.e(TAG, "Google Play services is unavailable.");
+            logGeoEvent("\nGoogle Play services is unavailable.");
             return false;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mLoginReceiver);
     }
 
     /**
@@ -189,6 +227,34 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
     private PendingIntent getGeofenceTransitionPendingIntent() {
         Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    BroadcastReceiver mLoginReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String type = intent.getStringExtra("type");
+            if(!TextUtils.isEmpty(type)){
+                if(type.equalsIgnoreCase("login"))
+                    logGeoEvent("\nLogged In : "+getCurrentTimeToDisplay());
+                else if(type.equalsIgnoreCase("logout"))
+                    logGeoEvent("\nLogged Out : "+getCurrentTimeToDisplay());
+            }
+
+        }
+    };
+
+    private void logGeoEvent(String event){
+        if(txt_login_time != null) txt_login_time.append(event);
+    }
+
+    private String getCurrentTimeToDisplay(){
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Calendar.getInstance().getTime());
+        } catch (Exception e){
+
+        }
+
+        return "";
     }
 
 }

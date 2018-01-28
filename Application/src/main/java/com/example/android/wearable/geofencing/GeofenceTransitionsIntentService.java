@@ -28,6 +28,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -99,12 +100,18 @@ public class GeofenceTransitionsIntentService extends IntentService
                 }
                 Toast.makeText(this, getString(R.string.entering_geofence),
                         Toast.LENGTH_SHORT).show();
+                Intent loginIntent = new Intent("ACTION_LOGIN");
+                loginIntent.putExtra("type","login");
+                LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(loginIntent);
                 mGoogleApiClient.disconnect();
             } else if (Geofence.GEOFENCE_TRANSITION_EXIT == transitionType) {
                 // Delete the data item when leaving a geofence region.
                 mGoogleApiClient.blockingConnect(CONNECTION_TIME_OUT_MS, TimeUnit.MILLISECONDS);
                 Wearable.DataApi.deleteDataItems(mGoogleApiClient, GEOFENCE_DATA_ITEM_URI).await();
                 showToast(this, R.string.exiting_geofence);
+                Intent loginIntent = new Intent("ACTION_LOGIN");
+                loginIntent.putExtra("type","logout");
+                LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(loginIntent);
                 mGoogleApiClient.disconnect();
             }
         }
