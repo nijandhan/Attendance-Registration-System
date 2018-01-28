@@ -36,7 +36,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
 import android.util.Log;
@@ -51,6 +54,7 @@ import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListe
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingEvent;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
 
@@ -189,6 +193,26 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
         //finish();
     }
 
+    public void showToast(final Context context, final int resourceId) {
+        Handler mainThread = new Handler(Looper.getMainLooper());
+        mainThread.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, context.getString(resourceId), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    public void showToast(final Context context, final String error) {
+        Handler mainThread = new Handler(Looper.getMainLooper());
+        mainThread.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     @Override
     public void onConnectionSuspended(int i) {
         if (null != mGeofenceRequestIntent) {
@@ -225,8 +249,17 @@ public class MainActivity extends Activity implements ConnectionCallbacks,
      * transition occurs.
      */
     private PendingIntent getGeofenceTransitionPendingIntent() {
-        Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
-        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        // Create an Intent pointing to the IntentService
+        Intent intent = new Intent("com.example.android.wearable.geofencing.ACTION_RECEIVE_GEOFENCE");
+
+        //MAKE SURE YOU CHANGE THIS TO getBroadcast if you are coming from the sample code.
+        return PendingIntent.getBroadcast(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+        /*Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
+        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);*/
     }
 
     BroadcastReceiver mLoginReceiver = new BroadcastReceiver() {

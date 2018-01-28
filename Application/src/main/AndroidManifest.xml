@@ -43,6 +43,13 @@
             </intent-filter>
         </activity>
 
+        <receiver android:name="com.example.android.wearable.geofencing.GeofenceReceiver"
+            android:exported="false">
+            <intent-filter >
+                <action android:name="com.example.android.wearable.geofencing.ACTION_RECEIVE_GEOFENCE"/>
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".GeofenceTransitionsIntentService"
             android:exported="false">
